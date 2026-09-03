@@ -3,6 +3,7 @@ import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Bot, Target, LineChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import { gsap } from 'gsap';
 import CareerParticles from '../components/landing/CareerParticles';
+import { supabase } from '../lib/supabase';
 
 // SVGs for Social Login
 const GoogleIcon = () => (
@@ -145,14 +146,84 @@ const AuthPage = () => {
     return () => ctx.revert();
   }, [mode]);
 
-  const handleLogin = (e) => {
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        navigate(`/${session.user.id}`);
+      }
+    };
+    checkExistingSession();
+  }, [navigate]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    console.log("Login submitted");
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      if (data?.user) {
+        navigate(`/${data.user.id}`);
+      }
+    } catch (error) {
+      console.error("Error logging in:", error.message);
+      alert(error.message);
+    }
   };
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    console.log("Signup submitted");
+    const name = e.target.name.value;
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    const confirmPassword = e.target.confirmPassword.value;
+
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: name },
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.session) {
+        navigate(`/${data.user.id}`);
+      } else {
+        alert("Signup successful! Please check your email for a confirmation link to log in.");
+      }
+    } catch (error) {
+      console.error("Error signing up:", error.message);
+      alert(error.message);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error logging in with Google:", error.message);
+    }
   };
 
   return (
@@ -225,8 +296,8 @@ const AuthPage = () => {
                 </div>
 
                 <form onSubmit={handleLogin}>
-                  <AuthInput label="Email" type="email" icon={Mail} placeholder="Enter your email" required autoComplete="email" />
-                  <AuthInput label="Password" type="password" icon={Lock} placeholder="Enter your password" required autoComplete="current-password" />
+                  <AuthInput name="email" label="Email" type="email" icon={Mail} placeholder="Enter your email" required autoComplete="email" />
+                  <AuthInput name="password" label="Password" type="password" icon={Lock} placeholder="Enter your password" required autoComplete="current-password" />
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', fontSize: '0.875rem' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
@@ -266,8 +337,8 @@ const AuthPage = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                  <SocialButton icon={GoogleIcon} provider="Google" onClick={() => console.log('Google login')} />
-                  <SocialButton icon={GitHubIcon} provider="GitHub" onClick={() => console.log('GitHub login')} />
+                  <SocialButton icon={GoogleIcon} provider="Google" onClick={handleGoogleLogin} />
+                  <SocialButton icon={GitHubIcon} provider="GitHub" onClick={() => console.log('GitHub signup')} />
                 </div>
                 <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                   New to InterPrep? <button onClick={() => setMode('signup')} style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Create an account</button>
@@ -280,10 +351,10 @@ const AuthPage = () => {
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Start preparing smarter with InterPrep</p>
                 </div>
                 <form onSubmit={handleSignup}>
-                  <AuthInput label="Full Name" type="text" icon={User} placeholder="Enter your full name" required autoComplete="name" />
-                  <AuthInput label="Email" type="email" icon={Mail} placeholder="Enter your email" required autoComplete="email" />
-                  <AuthInput label="Password" type="password" icon={Lock} placeholder="Create a password" required autoComplete="new-password" />
-                  <AuthInput label="Confirm Password" type="password" icon={Lock} placeholder="Confirm your password" required autoComplete="new-password" />
+                  <AuthInput name="name" label="Full Name" type="text" icon={User} placeholder="Enter your full name" required autoComplete="name" />
+                  <AuthInput name="email" label="Email" type="email" icon={Mail} placeholder="Enter your email" required autoComplete="email" />
+                  <AuthInput name="password" label="Password" type="password" icon={Lock} placeholder="Create a password" required autoComplete="new-password" />
+                  <AuthInput name="confirmPassword" label="Confirm Password" type="password" icon={Lock} placeholder="Confirm your password" required autoComplete="new-password" />
                   <button
                     type="submit"
                     style={{
@@ -313,7 +384,7 @@ const AuthPage = () => {
                   <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-light)' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                  <SocialButton icon={GoogleIcon} provider="Google" onClick={() => console.log('Google signup')} />
+                  <SocialButton icon={GoogleIcon} provider="Google" onClick={handleGoogleLogin} />
                   <SocialButton icon={GitHubIcon} provider="GitHub" onClick={() => console.log('GitHub signup')} />
                 </div>
 
